@@ -1,30 +1,50 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatBox } from './components/ChatBox';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { useChatStore } from './store/chatStore';
 import { AIModelId } from './types/chat';
 
+const API_KEY_TIMEOUT = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+
 function App() {
   const { apiKey, setApiKey, chats, activeChat, addChat, setActiveChat } = useChatStore();
 
+  // Secure cleanup of API key
+  const clearApiKey = useCallback(() => {
+    setApiKey(null);
+  }, [setApiKey]);
+
+  // Handle tab/browser closure
   useEffect(() => {
-    // Check for API key in environment variables
-    const envApiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (envApiKey && !apiKey) {
-      setApiKey(envApiKey);
+    const handleUnload = () => {
+      clearApiKey();
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [clearApiKey]);
+
+  // Time-based API key expiration (3 hours)
+  useEffect(() => {
+    let timeoutId: number | undefined;
+
+    if (apiKey) {
+      timeoutId = window.setTimeout(() => {
+        clearApiKey();
+      }, API_KEY_TIMEOUT);
     }
 
-    const handleTabClose = () => {
-      setApiKey(null);
-    };
-
-    window.addEventListener('beforeunload', handleTabClose);
     return () => {
-      window.removeEventListener('beforeunload', handleTabClose);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
-  }, [setApiKey, apiKey]);
+  }, [apiKey, clearApiKey]);
 
+  // Initialize first chat
   useEffect(() => {
     if (chats.length === 0) {
       const newChat = {
@@ -38,16 +58,17 @@ function App() {
       addChat(newChat);
       setActiveChat(newChat.id);
     } else if (!activeChat && chats.length > 0) {
-      // If there are chats but no active chat, set the first one as active
       setActiveChat(chats[0].id);
     }
   }, [chats.length, activeChat, addChat, setActiveChat, chats]);
 
   return (
-    <div className="flex min-h-screen bg-gray-900">
+    <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      <ChatBox />
-      {!apiKey && !import.meta.env.VITE_OPENAI_API_KEY && <ApiKeyModal />}
+      <div className="flex-1 flex flex-col">
+        <ChatBox />
+      </div>
+      {!apiKey && <ApiKeyModal />}
     </div>
   );
 }
