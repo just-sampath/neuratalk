@@ -29,7 +29,7 @@ function App() {
     if (chats.length === 0) {
       const newChat = {
         id: crypto.randomUUID(),
-        title: 'New Chat',
+        title: 'Chat 1',
         messages: [],
         createdAt: Date.now(),
         systemMessage: '',
